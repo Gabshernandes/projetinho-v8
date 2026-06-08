@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<!-- Informa ao navegador que este documento utiliza a versão mais recente do HTML (HTML5) -->
+<html lang="pt-BR">
+<head>
+    <!-- Configura o mapa de caracteres para UTF-8, garantindo que acentos funcionem perfeitamente -->
+    <meta charset="UTF-8">
+    
+    <!-- Força a tela a se adaptar ao tamanho de tablets, bloqueando o zoom indesejado do operador -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>Rastreabilidade JFA - Modo Tablet com Câmera (Versão Anterior)</title>
+    
+    <!-- Importação de Bibliotecas Externas via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        /* --- ESTILOS VISUAIS (CSS) --- */
+        :root {
+            --azul-jfa: #0056b3;       
+            --verde-sucesso: #28a745;  
+            --vermelho-erro: #dc3545;  
+            --bg-tablet: #f8f9fa;      
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+        body { background-color: var(--bg-tablet); padding: 15px; }
+
+        header {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border-bottom: 3px solid var(--azul-jfa);
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+
+        .menu-postos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+        
+        .btn-menu {
+            padding: 15px 5px;
+            border: 1px solid #dee2e6;
+            background-color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .btn-menu.ativo { background-color: var(--azul-jfa); color: #fff; }
+
+        .container-tela {
+            display: none; 
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .container-tela.ativa { display: block; }
+
+        .window-camera {
+            max-width: 450px;
+            width: 100%;
+            margin: 15px auto;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px dashed var(--azul-jfa);
+            background-color: #000;
+        }
+
+        input, select {
+            padding: 14px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 5px;
+            margin-bottom: 15px;
+        }
+
+        .painel-estoque {
+            background: #fff3cd;
+            color: #856404;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .btn-acao {
+            background-color: var(--verde-sucesso);
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 16px;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .historico-bips {
+            margin-top: 15px;
+            max-height: 120px;
+            overflow-y: auto;
+            background: #212529;
+            color: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .linha-log { padding: 4px 0; border-bottom: 1px solid #343a40; }
+        .log-ok { color: #28a745; }   
+        .log-erro { color: #dc3545; } 
+    </style>
+</head>
+<body>
+
+    <!-- CABEÇALHO DO SISTEMA -->
+    <header>
+        <div>
+            <h2>Rastreabilidade JFA (Câmera - Contagem Pura)</h2>
+        </div>
+        <nav class="menu-postos">
+            <button class="btn-menu ativo" onclick="chavearTela(1)">P1</button>
+            <button class="btn-menu" onclick="chavearTela(2)">P2</button>
+            <button class="btn-menu" onclick="chavearTela(3)">P3</button>
+            <button class="btn-menu" onclick="chavearTela(4)">P4</button>
+            <button class="btn-menu" onclick="chavearTela('admin')" style="background-color: #6c757d; color: white;">Dados</button>
+        </nav>
+    </header>
+
+    <!-- CONTAINER DA CÂMERA -->
+    <div id="secao-leitor-camera">
+        <div class="window-camera" id="reader"></div>
+    </div>
+
+    <!-- TELA DO POSTO 1 - ENTRADA -->
+    <div id="tela-posto1" class="container-tela ativa">
+        <h3>Posto 1 - Entrada de Placa (Por Quantidade)</h3>
+        
+        <label>Modelo do Produto:</label>
+        <select id="p1-modelo">
+            <option value="">-- Selecione o Modelo --</option>
+            <option value="Inversor_X1">Inversor de Frequência X1</option>
+            <option value="Modulo_Y2">Módulo Amplificador Y2</option>
+            <option value="Fonte_Z3">Fonte Automotiva Z3</option>
+        </select>
+        
+        <label>Ordem de Serviço (O.S.):</label>
+        <input type="text" id="p1-os" placeholder="Ex: OS-2026-889">
+        
+        <div class="historico-bips" id="p1-log"></div>
+    </div>
+
+    <!-- TELA DO POSTO 2 - MONTAGEM -->
+    <div id="tela-posto2" class="container-tela">
+        <h3>Posto 2 - Processo de Montagem</h3>
+        <div class="painel-estoque" id="p2-saldo">Pendente do P1: 0 peças</div>
+        <div class="historico-bips" id="p2-log"></div>
+    </div>
+
+    <!-- TELA DO POSTO 3 - TESTE FUNCIONAL -->
+    <div id="tela-posto3" class="container-tela">
+        <h3>Posto 3 - Teste Funcional</h3>
+        <div class="painel-estoque" id="p3-saldo">Pendente do P2: 0 peças</div>
+        <div class="historico-bips" id="p3-log"></div>
+    </div>
+
+    <!-- TELA DO POSTO 4 - EMBALAGEM / FECHAMENTO -->
+    <div id="tela-posto4" class="container-tela">
+        <h3>Posto 4 - Embalagem e Lote</h3>
+        <div class="painel-estoque" id="p4-saldo">Pendente do P3: 0 peças</div>
+        
+        <label>Código do Lote Final:</label>
+        <input type="text" id="p4-lote" placeholder="Digite o lote final">
+        <div class="historico-bips" id="p4-log"></div>
+    </div>
+
+    <!-- TELA ADMIN -->
+    <div id="tela-admin" class="container-tela">
+        <h3>Dados Coletados</h3><br>
+        <button class="btn-acao" onclick="gerarExcel()">📥 Exportar para Excel (.xlsx)</button>
+        <button class="btn-acao" onclick="limparBanco()" style="background-color: var(--vermelho-erro); margin-top: 10px;">Limpar Registros</button>
+    </div>
+
+    <!-- --- INTELIGÊNCIA DO SISTEMA (JAVASCRIPT) --- -->
+    <script>
+        let mfg_db = JSON.parse(localStorage.getItem('mfg_trace_db')) || [];
+        let html5QrcodeScanner = null;
+        let postoAtualAtivo = 1;     
+        let placasDoGrupoAtual = []; // Na V7 guardava apenas os códigos sem distinção de tipo
+
+        function iniciarCamera() {
+            if (html5QrcodeScanner) { html5QrcodeScanner.clear(); }
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                { fps: 15, qrbox: { width: 280, height: 150 } },
+                onScanSuccess
+            ).catch(err => { console.log("Aguardando câmera..."); });
+        }
+
+        function onScanSuccess(decodedText) {
+            const cod = decodedText.trim();
+            if (navigator.vibrate) navigator.vibrate(100);
+
+            if (postoAtualAtivo === 1) processarPosto1(cod);
+            else if (postoAtualAtivo === 2) processarPosto2(cod);
+            else if (postoAtualAtivo === 3) processarPosto3(cod);
+            else if (postoAtualAtivo === 4) processarPosto4(cod);
+        }
+
+        function chavearTela(postoId) {
+            document.querySelectorAll('.container-tela').forEach(t => t.classList.remove('ativa'));
+            document.querySelectorAll('.btn-menu').forEach(b => b.classList.remove('ativo'));
+            
+            if(postoId === 'admin') {
+                postoAtualAtivo = 'admin';
+                document.getElementById('tela-admin').classList.add('ativa');
+                event.target.classList.add('ativo');
+                document.getElementById('secao-leitor-camera').style.display = 'none'; 
+                if(html5QrcodeScanner) html5QrcodeScanner.stop();
+            } else {
+                postoAtualAtivo = postoId;
+                document.getElementById(`tela-posto${postoId}`).classList.add('ativa');
+                document.querySelectorAll('.btn-menu')[postoId - 1].classList.add('ativo');
+                document.getElementById('secao-leitor-camera').style.display = 'block'; 
+                iniciarCamera();
+            }
+            atualizarIndicadoresSaldos(); 
+        }
+
+        // LÓGICA ANTERIOR DO POSTO 1 - CONTAGEM SIMPLES
+        function processarPosto1(cod) {
+            const mod = document.getElementById('p1-modelo').value;
+            const os = document.getElementById('p1-os').value.trim();
+
+            if(!mod || !os) {
+                logMfg(1, "ERRO: Selecione Modelo e O.S. antes!", "erro");
+                return;
+            }
+
+            // Definição estática apenas por número de placas necessárias (exemplo: 2)
+            let limiteCasamento = 2; 
+
+            // Validação dinâmica simples adicionada na época para o modelo X1 exigir 3 unidades
+            if (mod === "Inversor_X1") {
+                limiteCasamento = 3;
+            }
+
+            if(mfg_db.some(x => x.id === cod) || placasDoGrupoAtual.includes(cod)) {
+                logMfg(1, `REJEIÇÃO: Placa ${cod} já existe.`, "erro");
+            } else {
+                placasDoGrupoAtual.push(cod);
+                logMfg(1, `Placa na mesa (${placasDoGrupoAtual.length}/${limiteCasamento}): ${cod}`, "ok");
+
+                if (placasDoGrupoAtual.length === limiteCasamento) {
+                    placasDoGrupoAtual.forEach(id => {
+                        mfg_db.push({ id: id, modelo: mod, os: os, postoAtual: 2, lote: '', ts: '' });
+                    });
+                    localStorage.setItem('mfg_trace_db', JSON.stringify(mfg_db));
+                    logMfg(1, `SUCESSO: Grupo casado enviado ao P2!`, "ok");
+                    
+                    placasDoGrupoAtual = []; 
+                    atualizarIndicadoresSaldos();
+                }
+            }
+        }
+
+        function processarPosto2(cod) {
+            let registro = mfg_db.find(x => x.id === cod);
+            if(registro && registro.postoAtual === 2) {
+                registro.postoAtual = 3; 
+                localStorage.setItem('mfg_trace_db', JSON.stringify(mfg_db));
+                logMfg(2, `OK: Placa ${cod} movida para o P3.`, "ok");
+                atualizarIndicadoresSaldos();
+            } else {
+                logMfg(2, `REJEIÇÃO: Sequência inválida para ${cod}`, "erro");
+            }
+        }
+
+        function processarPosto3(cod) {
+            let registro = mfg_db.find(x => x.id === cod);
+            if(registro && registro.postoAtual === 3) {
+                registro.postoAtual = 4; 
+                localStorage.setItem('mfg_trace_db', JSON.stringify(mfg_db));
+                logMfg(3, `OK: Teste aprovado para ${cod}.`, "ok");
+                atualizarIndicadoresSaldos();
+            } else {
+                logMfg(3, `REJEIÇÃO: Placa não liberada pelo P2.`, "erro");
+            }
+        }
+
+        function processarPosto4(cod) {
+            const lote = document.getElementById('p4-lote').value.trim();
+            let registro = mfg_db.find(x => x.id === cod);
+
+            if(!lote) {
+                logMfg(4, "ERRO: Digite o Lote antes de escanear.", "erro");
+                return;
+            }
+
+            if(registro && registro.postoAtual === 4) {
+                registro.postoAtual = 'Finalizado'; 
+                registro.lote = lote;               
+                registro.ts = new Date().toLocaleString('pt-BR'); 
+                
+                localStorage.setItem('mfg_trace_db', JSON.stringify(mfg_db));
+                logMfg(4, `CONCLUÍDO: ${cod} vinculada ao lote ${lote}.`, "ok");
+                atualizarIndicadoresSaldos();
+            } else {
+                logMfg(4, `REJEIÇÃO: Verifique o histórico da peça.`, "erro");
+            }
+        }
+
+        function atualizarIndicadoresSaldos() {
+            document.getElementById('p2-saldo').innerText = `Pendente do P1: ${mfg_db.filter(x => x.postoAtual === 2).length} peças`;
+            document.getElementById('p3-saldo').innerText = `Pendente do P2: ${mfg_db.filter(x => x.postoAtual === 3).length} peças`;
+            document.getElementById('p4-saldo').innerText = `Pendente do P3: ${mfg_db.filter(x => x.postoAtual === 4).length} peças`;
+        }
+
+        // Mostra o histórico na caixa preta de logs
+        function logMfg(posto, msg, status) {
+            const logElement = document.getElementById(`p${posto}-log`);
+            const classeCss = status === 'ok' ? 'log-ok' : 'log-erro';
+            logElement.innerHTML = `<div class="linha-log ${classeCss}">[${new Date().toLocaleTimeString()}] ${msg}</div>` + logElement.innerHTML;
+        }
+
+        function gerarExcel() {
+            if(mfg_db.length === 0) return alert("Não há dados.");
+            const ws = XLSX.utils.json_to_sheet(mfg_db);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Rastreio");
+            XLSX.writeFile(wb, `Rastreabilidade_Anterior_JFA.xlsx`);
+        }
+
+        function limparBanco() {
+            if(confirm("Deseja apagar permanentemente o histórico do tablet?")) { 
+                mfg_db = []; 
+                localStorage.removeItem('mfg_trace_db'); 
+                atualizarIndicadoresSaldos(); 
+            }
+        }
+
+        window.onload = () => { 
+            iniciarCamera();             
+            atualizarIndicadoresSaldos(); 
+        };
+    </script>
+</body>
+</html>
